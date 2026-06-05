@@ -1,153 +1,136 @@
 import { useEffect, useRef, useState } from "react";
 
-// Four sections mapped to 2.5s slices of the 10s clip.
-const SECTIONS = [
-  { start: 0, end: 2.5 },
-  { start: 2.5, end: 5 },
-  { start: 5, end: 7.5 },
-  { start: 7.5, end: 10 },
-];
-
 const VIDEO_SRC = `${import.meta.env.BASE_URL}videos/Dasani.mp4`;
 const MAX_SCALE = 1.12;
+const SECTION_COUNT = 4;
+const SECTION_SPAN = 1 / SECTION_COUNT; // 25% of scroll per section
 
 /**
- * Core feature. A fixed fullscreen background video that:
- *  1. Autoplays muted/inline on mobile, with a "Tap to start" fallback when
- *     the browser blocks autoplay. src is assigned after mount (iOS Safari).
- *  2. Zooms 1.0 → 1.12 across the full scroll range (rAF-driven transform).
- *  3. Apple-style scroll lock: entering a section locks the page and plays
- *     that section's video slice, unlocking once the slice finishes.
+ * Core feature. A single requestAnimationFrame loop, fed by a passive scroll
+ * listener, drives EVERYTHING from one scroll progress value:
+ *   - video.currentTime = progress * duration  (scrubbing)
+ *   - video zoom: scale 1.0 -> 1.12
+ *   - per-word text reveal in every section, by each section's local progress
  *
- * Degrades to an animated gradient if the mp4 is missing.
+ * The video is preloaded as a Blob URL for smooth scrubbing, autoplays
+ * muted/inline on mobile, and shows a "Tap to start" overlay if blocked.
+ * Falls back to an animated gradient when the mp4 is missing.
  */
-export default function VideoScroll({ setActive }) {
+export default function VideoScroll() {
   const videoRef = useRef(null);
   const rafRef = useRef(0);
-  const indexRef = useRef(-1);
-  const lockTimerRef = useRef(0);
   const [fallback, setFallback] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
 
-  // iOS Safari: assign src after mount, then attempt autoplay.
+  // Preload the video as a Blob URL, then probe autoplay.
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    video.src = VIDEO_SRC;
-    video.load();
+    let blobUrl;
+    let cancelled = false;
 
-    const tryPlay = async () => {
-      try {
-        await video.play();
-        video.pause(); // playback is driven per-section below
-        setNeedsTap(false);
-      } catch {
-        setNeedsTap(true);
-      }
+    const probeAutoplay = () => {
+      video
+        .play()
+        .then(() => {
+          video.pause(); // playback position is driven by scroll
+          setNeedsTap(false);
+        })
+        .catch(() => setNeedsTap(true));
     };
-    tryPlay();
+
+    fetch(VIDEO_SRC)
+      .then((res) => {
+        if (!res.ok) throw new Error("video fetch failed");
+        return res.blob();
+      })
+      .then((blob) => {
+        if (cancelled) return;
+        blobUrl = URL.createObjectURL(blob);
+        video.src = blobUrl;
+        video.load();
+        probeAutoplay();
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Fall back to streaming the file directly.
+        video.src = VIDEO_SRC;
+        video.load();
+        probeAutoplay();
+      });
+
+    return () => {
+      cancelled = true;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
   }, []);
 
-  // Scroll-driven zoom + active-section detection + slice playback.
+  // The one and only scroll-driven loop.
   useEffect(() => {
     const video = videoRef.current;
 
-    const unlock = () => {
-      document.body.style.overflow = "";
-      if (lockTimerRef.current) {
-        clearTimeout(lockTimerRef.current);
-        lockTimerRef.current = 0;
-      }
-    };
-
-    const playSlice = (index) => {
-      const slice = SECTIONS[index];
-      if (!video || !slice || fallback) return;
-      if (!video.duration || Number.isNaN(video.duration)) return;
-
-      document.body.style.overflow = "hidden";
-      try {
-        video.currentTime = slice.start;
-      } catch {
-        /* seeking before metadata is ready — ignore */
-      }
-
-      const onTime = () => {
-        if (video.currentTime >= slice.end) {
-          video.removeEventListener("timeupdate", onTime);
-          video.pause();
-          unlock();
-        }
-      };
-      video.addEventListener("timeupdate", onTime);
-      video.play().catch(() => {
-        setNeedsTap(true);
-        video.removeEventListener("timeupdate", onTime);
-        unlock();
-      });
-
-      // Safety net so the user is never trapped if timeupdate stalls.
-      clearTimeout(lockTimerRef.current);
-      lockTimerRef.current = setTimeout(() => {
-        video.removeEventListener("timeupdate", onTime);
-        unlock();
-      }, (slice.end - slice.start) * 1000 + 800);
-    };
-
-    const update = () => {
+    const run = () => {
       rafRef.current = 0;
-      const scrollable =
-        document.documentElement.scrollHeight - window.innerHeight;
-      const progress =
-        scrollable > 0
-          ? Math.min(1, Math.max(0, window.scrollY / scrollable))
-          : 0;
 
-      // Zoom effect.
+      const max = document.body.scrollHeight - window.innerHeight;
+      const progress = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+
+      // Video: scrub + zoom.
       if (video && !fallback) {
-        const scale = 1 + (MAX_SCALE - 1) * progress;
-        video.style.transform = `translateZ(0) scale(${scale})`;
+        if (video.duration && !Number.isNaN(video.duration)) {
+          video.currentTime = progress * video.duration;
+        }
+        const scale = 1 + progress * (MAX_SCALE - 1);
+        video.style.transform = `scale(${scale}) translateZ(0)`;
       }
 
-      // Active section (snap to nearest 100vh band).
-      const index = Math.min(
-        SECTIONS.length - 1,
-        Math.max(0, Math.floor(window.scrollY / window.innerHeight + 0.5))
-      );
-      if (index !== indexRef.current) {
-        indexRef.current = index;
-        setActive(index);
-        playSlice(index);
-      }
+      // Text: per-word reveal driven by each section's local progress.
+      const sections = document.querySelectorAll("[data-section-index]");
+      sections.forEach((el) => {
+        const idx = Number(el.dataset.sectionIndex);
+        const local = Math.min(
+          1,
+          Math.max(0, (progress - idx * SECTION_SPAN) / SECTION_SPAN)
+        );
+        const words = el.querySelectorAll("[data-word]");
+        const total = words.length || 1;
+        words.forEach((word, n) => {
+          const t = Math.min(1, Math.max(0, local * total - n));
+          word.style.opacity = String(t);
+          word.style.transform = `translateY(${20 * (1 - t)}px)`;
+        });
+      });
     };
 
     const onScroll = () => {
       if (rafRef.current) return;
-      rafRef.current = requestAnimationFrame(update);
+      rafRef.current = requestAnimationFrame(run);
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
-    onScroll(); // initialize section 0
+    run(); // initialize at load
 
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      unlock();
     };
-  }, [fallback, setActive]);
+  }, [fallback]);
 
-  const handleTap = async () => {
+  const handleTap = () => {
     const video = videoRef.current;
     if (!video) return;
-    try {
-      await video.play();
-      setNeedsTap(false);
-    } catch {
-      /* still blocked — leave the overlay up */
-    }
+    video
+      .play()
+      .then(() => {
+        video.pause();
+        setNeedsTap(false);
+      })
+      .catch(() => {
+        /* still blocked — keep the overlay */
+      });
   };
 
   return (
@@ -160,12 +143,11 @@ export default function VideoScroll({ setActive }) {
             muted
             playsInline
             autoPlay
-            loop
             preload="auto"
             onError={() => setFallback(true)}
             style={{
               willChange: "transform",
-              transform: "translateZ(0) scale(1)",
+              transform: "scale(1) translateZ(0)",
             }}
           />
         )}
