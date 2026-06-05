@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@import "./styles/variables.css";
+
+html {
+  scroll-behavior: auto;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-dark);
+  color: var(--color-white);
+  font-family: var(--font-english);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+html[dir="rtl"] body {
+  font-family: var(--font-arabic);
+}

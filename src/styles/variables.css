@@ -1,0 +1,10 @@
+:root {
+  --color-primary: #0288d1;
+  --color-light: #4fc3f7;
+  --color-accent: #29b6f6;
+  --color-white: #ffffff;
+  --color-dark: #0a1628;
+
+  --font-arabic: "Cairo", sans-serif;
+  --font-english: "Nunito", sans-serif;
+}
