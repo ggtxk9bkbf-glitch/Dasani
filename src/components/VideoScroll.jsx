@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
 const VIDEO_SRC = `${import.meta.env.BASE_URL}videos/Dasani.mp4`;
-const MAX_SCALE = 1.12;
 const SECTION_COUNT = 4;
 const SECTION_SPAN = 1 / SECTION_COUNT; // 25% of scroll per section
 
@@ -87,7 +86,7 @@ export default function VideoScroll() {
     };
 
     const loop = () => {
-      // Video: smooth scrub via lerp + zoom.
+      // Video: smooth scrub via lerp.
       if (video && !fallback) {
         if (video.duration && !Number.isNaN(video.duration)) {
           currentTime = lerp(currentTime, targetTime, 0.3);
@@ -102,8 +101,6 @@ export default function VideoScroll() {
             }
           }
         }
-        const scale = MAX_SCALE - progress * (MAX_SCALE - 1);
-        video.style.transform = `scale(${scale}) translateZ(0)`;
       }
 
       // Text: per-word reveal driven by each section's local progress.
@@ -172,7 +169,7 @@ export default function VideoScroll() {
               objectFit: "cover",
               objectPosition: "center center",
               willChange: "transform",
-              transform: "scale(1) translateZ(0)",
+              transform: "translateZ(0)",
             }}
           />
         )}
