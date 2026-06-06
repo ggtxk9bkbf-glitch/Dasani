@@ -86,8 +86,10 @@ export default function VideoScroll() {
     };
 
     const loop = () => {
-      // Video: smooth scrub via lerp.
-      if (video && !fallback) {
+      // Video: smooth scrub via lerp — desktop only (>= 768px).
+      // On mobile the video is left exactly as is (no scroll scrubbing).
+      const isDesktop = window.innerWidth >= 768;
+      if (isDesktop && video && !fallback) {
         if (video.duration && !Number.isNaN(video.duration)) {
           currentTime = lerp(currentTime, targetTime, 0.3);
           if (
