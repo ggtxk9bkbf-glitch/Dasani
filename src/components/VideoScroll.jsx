@@ -8,16 +8,16 @@ const DESKTOP_MIN = 768;
 /**
  * Fixed fullscreen background video.
  *
+ * Mobile (< 768px): scroll-driven scrubbing — the rAF loop lerps
+ * video.currentTime toward progress * duration for a smooth scrub.
+ *
  * Desktop (>= 768px): the video plays continuously and loops as a smooth
- * cinematic background — native decode, no per-frame seeking, so no scrubbing
- * stutter. Scroll drives only the per-word text reveal.
+ * cinematic background (scroll scrubbing stutters on desktop because each
+ * seek re-decodes from a keyframe). Scroll drives only the text reveal.
  *
- * Mobile (< 768px): behavior is intentionally left untouched — the video is
- * probed for autoplay then paused on its first frame (static poster look),
- * with a "Tap to start" overlay if autoplay is blocked.
- *
- * The video is preloaded as a Blob URL for a fast start, and falls back to an
- * animated gradient when the mp4 is missing.
+ * The video is preloaded as a Blob URL for a fast start, autoplays
+ * muted/inline, shows a "Tap to start" overlay if blocked, and falls back to
+ * an animated gradient when the mp4 is missing.
  */
 export default function VideoScroll() {
   const videoRef = useRef(null);
@@ -35,14 +35,13 @@ export default function VideoScroll() {
 
     const probeAutoplay = () => {
       const isDesktop = window.innerWidth >= DESKTOP_MIN;
-      // Looping is enabled for desktop only, via JS, so the mobile element
-      // stays exactly as it was (no loop attribute applied to it).
+      // Desktop loops as an ambient background; mobile is paused so the
+      // scroll loop can drive currentTime (scrubbing). loop is set via JS so
+      // it only ever applies to desktop.
       if (isDesktop) video.loop = true;
       video
         .play()
         .then(() => {
-          // Desktop: keep playing (looping ambient background).
-          // Mobile: pause on the first frame (unchanged behavior).
           if (!isDesktop) video.pause();
           setNeedsTap(false);
         })
@@ -75,18 +74,46 @@ export default function VideoScroll() {
     };
   }, []);
 
-  // Single rAF loop: a passive scroll listener stores scroll progress, and the
-  // loop drives the per-word text reveal in every section from it. The video
-  // is no longer scrubbed — it plays on its own for a smooth visual.
+  // Single rAF loop: a passive scroll listener stores scroll progress. On
+  // mobile the loop scrubs video.currentTime; on all devices it drives the
+  // per-word text reveal. (Desktop video plays on its own — no scrubbing.)
   useEffect(() => {
-    let progress = 0;
+    const lerp = (a, b, t) => a + (b - a) * t;
+
+    let progress = 0; // latest scroll progress (drives text + mobile scrub)
+    let targetTime = 0; // where the mobile video should seek to
+    let currentTime = 0; // interpolated playhead (mobile)
 
     const readProgress = () => {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       progress = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+      const video = videoRef.current;
+      if (video && video.duration && !Number.isNaN(video.duration)) {
+        targetTime = progress * video.duration;
+      }
     };
 
     const loop = () => {
+      // Mobile only: smooth scroll-driven scrubbing via lerp.
+      const isMobile = window.innerWidth < DESKTOP_MIN;
+      const video = videoRef.current;
+      if (isMobile && video) {
+        if (video.duration && !Number.isNaN(video.duration)) {
+          currentTime = lerp(currentTime, targetTime, 0.3);
+          if (
+            video.readyState >= 2 &&
+            Math.abs(currentTime - video.currentTime) > 0.01
+          ) {
+            try {
+              video.currentTime = currentTime;
+            } catch {
+              /* seeking before ready — ignore */
+            }
+          }
+        }
+      }
+
+      // Text: per-word reveal driven by each section's local progress.
       const sections = document.querySelectorAll("[data-section-index]");
       sections.forEach((el) => {
         const idx = Number(el.dataset.sectionIndex);
