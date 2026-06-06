@@ -79,7 +79,7 @@ export default function VideoScroll() {
     let currentTime = 0; // interpolated playhead
 
     const readProgress = () => {
-      const max = document.body.scrollHeight - window.innerHeight;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
       progress = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
       if (video && video.duration && !Number.isNaN(video.duration)) {
         targetTime = progress * video.duration;
@@ -102,7 +102,7 @@ export default function VideoScroll() {
             }
           }
         }
-        const scale = 1 + progress * (MAX_SCALE - 1);
+        const scale = MAX_SCALE - progress * (MAX_SCALE - 1);
         video.style.transform = `scale(${scale}) translateZ(0)`;
       }
 
