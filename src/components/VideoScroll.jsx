@@ -160,7 +160,7 @@ export default function VideoScroll() {
         {!fallback && (
           <video
             ref={videoRef}
-            className="object-cover"
+            className="object-cover inset-x-0 mx-auto w-screen md:w-[75vw]"
             muted
             playsInline
             autoPlay
@@ -169,8 +169,6 @@ export default function VideoScroll() {
             style={{
               position: "fixed",
               top: 0,
-              left: 0,
-              width: "100vw",
               height: "100vh",
               objectFit: "cover",
               objectPosition: "center center",
