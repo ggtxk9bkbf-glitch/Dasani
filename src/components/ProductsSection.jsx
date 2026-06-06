@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { useLanguage } from "../context/LanguageContext.jsx";
 import ScrollWords from "./ScrollWords.jsx";
 
@@ -10,7 +11,7 @@ const BOTTLE_IMAGES = [
 ];
 
 function BottleFallback({ large }) {
-  const h = large ? "320px" : "150px";
+  const h = large ? "300px" : "150px";
   return (
     <svg
       viewBox="0 0 60 140"
@@ -37,82 +38,75 @@ function BottleFallback({ large }) {
   );
 }
 
-function Lightbox({ size, image, onClose }) {
+function ProductModal({ product, font, onClose }) {
   const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [onClose]);
+  const { name, size, description, image } = product;
 
   return (
-    <div
+    <motion.div
       onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${name} ${size}`}
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 100,
+        zIndex: 1000,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(10,22,40,0.85)",
-        backdropFilter: "blur(12px)",
-        animation: "lb-in 0.25s cubic-bezier(0.22,1,0.36,1)",
+        padding: "1.5rem",
+        background: "rgba(0, 0, 0, 0.85)",
+        backdropFilter: "blur(10px)",
+        fontFamily: font,
       }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Dasani ${size}`}
     >
-      <div
+      <motion.div
         onClick={(e) => e.stopPropagation()}
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
         style={{
+          position: "relative",
+          width: "100%",
+          maxWidth: "400px",
+          padding: "2rem",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: "1.5rem",
-          padding: "2.5rem",
+          gap: "1rem",
+          textAlign: "center",
+          color: "var(--color-white)",
+          background: "rgba(255, 255, 255, 0.05)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
           borderRadius: "1.5rem",
-          background: "rgba(255,255,255,0.06)",
-          border: "1px solid rgba(255,255,255,0.12)",
-          animation: "lb-scale-in 0.3s cubic-bezier(0.22,1,0.36,1)",
         }}
       >
-        {failed ? (
-          <BottleFallback large />
-        ) : (
-          <img
-            src={`${import.meta.env.BASE_URL}${image}`}
-            alt={`Dasani ${size}`}
-            onError={() => setFailed(true)}
-            style={{ maxHeight: "60vh", maxWidth: "80vw", objectFit: "contain" }}
-          />
-        )}
-        <span
-          style={{
-            fontSize: "clamp(1.2rem, 3vw, 1.8rem)",
-            fontWeight: 700,
-            color: "var(--color-light)",
-          }}
-        >
-          {size}
-        </span>
         <button
           type="button"
           onClick={onClose}
+          aria-label="Close"
           style={{
-            marginTop: "0.5rem",
-            padding: "0.5rem 1.5rem",
+            position: "absolute",
+            top: "1rem",
+            right: "1rem",
+            width: "2rem",
+            height: "2rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             borderRadius: "9999px",
-            background: "rgba(255,255,255,0.1)",
-            border: "1px solid rgba(255,255,255,0.2)",
+            background: "rgba(255, 255, 255, 0.1)",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
             color: "var(--color-white)",
             cursor: "pointer",
-            fontSize: "0.9rem",
+            fontSize: "1rem",
+            lineHeight: 1,
             transition: "background 0.2s",
           }}
           onMouseOver={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.2)")}
@@ -120,8 +114,24 @@ function Lightbox({ size, image, onClose }) {
         >
           ✕
         </button>
-      </div>
-    </div>
+
+        {failed ? (
+          <BottleFallback large />
+        ) : (
+          <img
+            src={`${import.meta.env.BASE_URL}${image}`}
+            alt={`${name} ${size}`}
+            onError={() => setFailed(true)}
+            style={{ maxHeight: "300px", objectFit: "contain" }}
+          />
+        )}
+
+        <h3 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--color-light)" }}>
+          {name} <span style={{ color: "var(--color-white)" }}>{size}</span>
+        </h3>
+        <p style={{ fontSize: "1rem", opacity: 0.85, lineHeight: 1.6 }}>{description}</p>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -156,7 +166,7 @@ function ProductCard({ size, image, onClick }) {
 
 export default function ProductsSection() {
   const { t } = useLanguage();
-  const [active, setActive] = useState(null); // { size, image }
+  const [active, setActive] = useState(null); // index of open product, or null
 
   return (
     <section
@@ -165,11 +175,6 @@ export default function ProductsSection() {
       className="flex min-h-screen flex-col items-center justify-center px-6 pt-[5vh] pb-20"
       style={{ fontFamily: t.font }}
     >
-      <style>{`
-        @keyframes lb-in { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes lb-scale-in { from { opacity: 0; transform: scale(0.9) } to { opacity: 1; transform: scale(1) } }
-      `}</style>
-
       <div className="w-full max-w-5xl text-center">
         <ScrollWords
           text={t.products.heading}
@@ -187,19 +192,26 @@ export default function ProductsSection() {
               key={size}
               size={size}
               image={BOTTLE_IMAGES[i]}
-              onClick={() => setActive({ size, image: BOTTLE_IMAGES[i] })}
+              onClick={() => setActive(i)}
             />
           ))}
         </div>
       </div>
 
-      {active && (
-        <Lightbox
-          size={active.size}
-          image={active.image}
-          onClose={() => setActive(null)}
-        />
-      )}
+      <AnimatePresence>
+        {active !== null && (
+          <ProductModal
+            product={{
+              name: t.products.name,
+              size: t.products.sizes[active],
+              description: t.products.descriptions[active],
+              image: BOTTLE_IMAGES[active],
+            }}
+            font={t.font}
+            onClose={() => setActive(null)}
+          />
+        )}
+      </AnimatePresence>
     </section>
   );
 }

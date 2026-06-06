@@ -16,7 +16,14 @@ export const translations = {
     },
     products: {
       heading: "Our Products",
+      name: "Dasani",
       sizes: ["330ML", "600ML", "8L", "5 GAL"],
+      descriptions: [
+        "Perfect for on-the-go hydration",
+        "Your daily essential",
+        "Family size, pure refreshment",
+        "Home & office dispenser",
+      ],
     },
     ingredients: {
       heading: "Ingredients",
@@ -47,7 +54,14 @@ export const translations = {
     },
     products: {
       heading: "منتجاتنا",
+      name: "داساني",
       sizes: ["330 مل", "600 مل", "8 لتر", "5 جالون"],
+      descriptions: [
+        "مثالية للترطيب أثناء التنقل",
+        "رفيقك اليومي الأساسي",
+        "حجم العائلة، انتعاش نقي",
+        "موزّع المنزل والمكتب",
+      ],
     },
     ingredients: {
       heading: "المكونات",
