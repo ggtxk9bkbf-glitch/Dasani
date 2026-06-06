@@ -157,7 +157,7 @@ export default function VideoScroll() {
         {!fallback && (
           <video
             ref={videoRef}
-            className="object-cover top-0 left-0 w-screen h-screen md:inset-0 md:m-auto md:h-[85vh] md:w-[90vw]"
+            className="object-cover"
             muted
             playsInline
             autoPlay
@@ -166,6 +166,10 @@ export default function VideoScroll() {
             onError={() => setFallback(true)}
             style={{
               position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
               objectFit: "cover",
               objectPosition: "center center",
               willChange: "transform",
