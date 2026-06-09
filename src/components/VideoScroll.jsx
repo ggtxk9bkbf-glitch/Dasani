@@ -94,6 +94,9 @@ export default function VideoScroll() {
       const isMobile = window.innerWidth < DESKTOP_MIN;
       const video = videoRef.current;
       if (isMobile && video && video.duration && !Number.isNaN(video.duration)) {
+        // Keep mobile strictly seek-driven: if autoplay (or iOS) ever resumes
+        // playback, force it back to paused so scroll is the only driver.
+        if (!video.paused) video.pause();
         currentTime = lerp(currentTime, targetTime, 0.3);
         if (
           video.readyState >= 2 &&
